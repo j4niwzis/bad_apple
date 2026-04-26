@@ -121,8 +121,8 @@ export struct Movie {
   }
   constexpr auto frame(std::size_t frame_index) const {
     const auto h = static_cast<std::size_t>(header().height);
-    return std::views::iota(std::size_t{}, h) | std::views::transform([this, frame_index](std::size_t x) {
-             return row_chars(frame_index, x);
+    return std::views::iota(std::size_t{}, h) | std::views::transform([this, frame_index](std::size_t y) {
+             return row_chars(frame_index, y);
            });
   }
   constexpr auto frames() const {

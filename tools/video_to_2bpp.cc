@@ -36,6 +36,11 @@ template <class T>
 }
 
 int main(int argc, const char* argv[]) {
+  if(argc < 3) {
+    std::println(stderr, "Usage: {} <input.mp4> <output.bin>", argv[0]);
+    return 1;
+  }
+
   constexpr std::uint32_t pixels_per_frame = cfg::target_width * cfg::target_height;
 
   constexpr std::uint32_t bytes_per_frame = (pixels_per_frame + 3) / 4;
@@ -114,9 +119,7 @@ int main(int argc, const char* argv[]) {
       ++output_frame_count;
       next_sample_time += sample_interval;
 
-      std::string msg;
-      std::format_to(std::back_inserter(msg), "Processed frame {:>5} at {:8.3f}s", output_frame_count, current_time);
-      std::println("{}", msg);
+      std::println("Processed frame {:>5} at {:8.3f}s", output_frame_count, current_time);
     }
 
     ++input_frame_index;
@@ -142,13 +145,10 @@ int main(int argc, const char* argv[]) {
     return 1;
   }
 
-  std::string summary;
-  std::format_to(std::back_inserter(summary),
-                 "Done. frames={}, bytes/frame={}, total payload bytes={}",
-                 header.frame_count,
-                 header.bytes_per_frame,
-                 packed_frames.size());
-  std::println("{}", summary);
+  std::println("Done. frames={}, bytes/frame={}, total payload bytes={}",
+               header.frame_count,
+               header.bytes_per_frame,
+               packed_frames.size());
 
   return 0;
 }

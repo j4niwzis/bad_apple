@@ -7,10 +7,10 @@ inline constexpr unsigned char embedded_bad_apple_ogg[] = {
 };
 inline constexpr std::size_t embedded_bad_apple_ogg_size = sizeof(embedded_bad_apple_ogg);
 
-inline constexpr const char page_begin_arr[] = {
+inline constexpr char page_begin_arr[] = {
 #embed "templates/page_begin.html"
 };
-inline constexpr std::string_view page_begin{&page_begin_arr[0], sizeof(page_begin_arr)};
+inline constexpr std::string_view page_begin{page_begin_arr, sizeof(page_begin_arr)};
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
@@ -47,8 +47,8 @@ awaitable<void> stream(beast::tcp_stream& stream, unsigned version) {
 
 boost::asio::awaitable<void> handle_request(beast::tcp_stream& stream, request_t req) {
   std::println("[request] {} {} http/{}.{}",
-               std::string_view{req.method_string().data(), req.method_string().size()},
-               std::string_view{req.target().data(), req.target().size()},
+               std::string_view(req.method_string()),
+               std::string_view(req.target()),
                req.version() / 10,
                req.version() % 10);
 

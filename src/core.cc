@@ -4,6 +4,17 @@ export import boost;
 
 extern "C" std::FILE* const stderr;
 
+inline void log_exception(std::exception_ptr ep, std::FILE* out, std::string_view tag) {
+  if(!ep) {
+    return;
+  }
+  try {
+    std::rethrow_exception(ep);
+  } catch(std::exception const& e) {
+    std::println(out, "[{}] {}", tag, e.what());
+  }
+}
+
 namespace bad_apple {
 
 namespace asio = boost::asio;
@@ -104,14 +115,7 @@ boost::asio::awaitable<void> listener(auto&& handle_request, server_config cfg) 
     std::println("[accept] {}:{}", remote.address().to_string(), remote.port());
 
     boost::asio::co_spawn(ex, serve_connection(handle_request, std::move(socket)), [](std::exception_ptr ep) {
-      if(!ep) {
-        return;
-      }
-      try {
-        std::rethrow_exception(ep);
-      } catch(std::exception const& e) {
-        std::println((stderr), "[spawn error] {}", e.what());
-      }
+      log_exception(ep, stderr, "spawn error");
     });
   }
 }
@@ -121,14 +125,7 @@ export int run_server(auto handle_request, server_config config) {
     boost::asio::io_context io(8);
 
     boost::asio::co_spawn(io, listener(std::move(handle_request), std::move(config)), [](std::exception_ptr ep) {
-      if(!ep) {
-        return;
-      }
-      try {
-        std::rethrow_exception(ep);
-      } catch(std::exception const& e) {
-        std::println(stderr, "[fatal coroutine error] {}", e.what());
-      }
+      log_exception(ep, stderr, "fatal coroutine error");
     });
 
     io.run();
