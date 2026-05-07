@@ -71,6 +71,12 @@ export using http::response_serializer;
 
 }  // namespace beast
 
+namespace intrusive::detail {
+
+export using detail::destructor_impl;
+
+}
+
 }  // namespace boost
 
 namespace std {
@@ -78,15 +84,3 @@ namespace std {
 export using std::coroutine_traits;
 
 }
-
-namespace {
-
-inline void instantiate_beast_http() {
-  using namespace boost::beast::http;  // NOLINT
-  request<string_body> req;
-  response<dynamic_body> res;
-  (void)req;
-  (void)res;
-}
-
-}  // namespace

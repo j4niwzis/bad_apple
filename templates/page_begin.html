@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <body>
-<span class="badapple">BAD_APPLE</span>
-<audio autoplay muted controls style="display: block; margin-top: 10px;">
-  <source src="/bad-apple.ogg" type="audio/ogg">
-</audio>
-</body>
 <style>
 .badapple::before{
 display: block;
@@ -15,5 +10,14 @@ font-variant-ligatures: none;
 font-feature-settings: "liga" 0, "clig" 0;
 font-kerning: normal;
 letter-spacing: 0;
+}
+</style>
+<span class="badapple">BAD_APPLE</span>
+<audio preload="auto">
+<source src="/bad_apple/bad-apple.ogg" type="audio/ogg">
+</audio>
+<style>
+.badapple::before{
+content: "Loading...";
 }
 </style>

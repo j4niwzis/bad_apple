@@ -1,19 +1,9 @@
+module;
+#include <cstdio>
 export module bad_apple.core;
+
 import std;
-export import boost;
-
-extern "C" std::FILE* const stderr;
-
-inline void log_exception(std::exception_ptr ep, std::FILE* out, std::string_view tag) {
-  if(!ep) {
-    return;
-  }
-  try {
-    std::rethrow_exception(ep);
-  } catch(std::exception const& e) {
-    std::println(out, "[{}] {}", tag, e.what());
-  }
-}
+import boost;
 
 namespace bad_apple {
 
@@ -22,114 +12,115 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 using asio::awaitable;
 
-export using request_t = http::request<http::string_body>;
-
-export struct server_config {
-  std::string bind_address = "0.0.0.0";
-  unsigned short port = 8080;
+export struct ServerConfig {
+  std::string bind_address;
+  unsigned short port;
 };
 
+export using Request = http::request<http::string_body>;
+
 export template <class Body, class Fields>
-awaitable<void> send_message(beast::tcp_stream& stream, http::response<Body, Fields>&& res) {
+awaitable<void> send(beast::tcp_stream& stream, http::response<Body, Fields>&& res) {
   co_await http::async_write(stream, res, asio::use_awaitable);
 }
 
-export awaitable<void> send_text_response(
-    beast::tcp_stream& stream, unsigned version, http::status status, std::string body, bool keep_alive = false) {
-  http::response<http::string_body> res{status, version};
+export awaitable<void> send_text(
+    beast::tcp_stream& stream, unsigned http_version, http::status status, std::string body, bool keep_alive = false) {
+  http::response<http::string_body> res{status, http_version};
   res.set(http::field::server, "bad-apple");
   res.set(http::field::content_type, "text/plain; charset=utf-8");
   res.keep_alive(keep_alive);
   res.body() = std::move(body);
   res.prepare_payload();
-
-  co_await send_message(stream, std::move(res));
+  co_await send(stream, std::move(res));
 }
 
-export awaitable<void> send_binary_response(beast::tcp_stream& stream,
-                                            unsigned version,
-                                            http::status status,
-                                            std::string_view content_type,
-                                            std::span<const unsigned char> data,
-                                            bool keep_alive = false) {
-  using body_t = http::vector_body<std::uint8_t>;
-  http::response<body_t> res{status, version};
+export awaitable<void> send_binary(beast::tcp_stream& stream,
+                                   unsigned http_version,
+                                   http::status status,
+                                   std::string_view content_type,
+                                   std::span<const unsigned char> data,
+                                   bool keep_alive = false) {
+  http::response<http::vector_body<std::uint8_t>> res{status, http_version};
   res.set(http::field::server, "bad-apple");
   res.set(http::field::content_type, content_type);
   res.keep_alive(keep_alive);
-
-  res.body() = std::vector<std::uint8_t>(data.data(), data.data() + data.size());
+  res.body() = std::vector<std::uint8_t>(data.begin(), data.end());
   res.prepare_payload();
-
-  co_await send_message(stream, std::move(res));
+  co_await send(stream, std::move(res));
 }
 
-export awaitable<void> send_not_found(beast::tcp_stream& stream, unsigned version) {
-  co_await send_text_response(stream, version, http::status::not_found, "not found\n", false);
+export awaitable<void> send_not_found(beast::tcp_stream& stream, unsigned http_version) {
+  co_await send_text(stream, http_version, http::status::not_found, "not found\n", false);
 }
 
-export awaitable<void> send_stream_chunk(beast::tcp_stream& stream, std::string_view chunk) {
-  // http chunked body piece
+export awaitable<void> send_chunk(beast::tcp_stream& stream, std::string_view chunk) {
   co_await asio::async_write(stream.socket(), http::make_chunk(asio::buffer(chunk)), asio::use_awaitable);
 }
 
-export awaitable<void> send_stream_last_chunk(beast::tcp_stream& stream) {
+export awaitable<void> send_last_chunk(beast::tcp_stream& stream) {
   co_await asio::async_write(stream.socket(), http::make_chunk_last(), asio::use_awaitable);
 }
 
-export awaitable<request_t> read_request(beast::tcp_stream& stream, beast::flat_buffer& buffer) {
+export awaitable<Request> read_request(beast::tcp_stream& stream, beast::flat_buffer& buffer) {
   http::request_parser<http::string_body> parser;
   parser.body_limit(1024 * 1024);
-
-  co_await boost::beast::http::async_read(stream, buffer, parser, asio::use_awaitable);
+  co_await http::async_read(stream, buffer, parser, asio::use_awaitable);
   co_return parser.release();
 }
 
-export awaitable<void> serve_connection(auto&& handle_request, boost::asio::ip::tcp::socket socket) {
-  boost::beast::tcp_stream stream(std::move(socket));
-  boost::beast::flat_buffer buffer;
+export awaitable<void> serve_connection(auto&& handler, asio::ip::tcp::socket socket) {
+  beast::tcp_stream stream(std::move(socket));
+  beast::flat_buffer buffer;
 
   try {
     auto req = co_await read_request(stream, buffer);
-    co_await handle_request(stream, std::move(req));
-  } catch(std::exception const& e) {
-    std::println(stderr, "[session error] {}", e.what());
+    co_await handler(stream, std::move(req));
+  } catch(const std::exception& e) {
+    std::println(stderr, "[session] {}", e.what());
   }
 
-  boost::beast::error_code ec;
-  stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+  beast::error_code ec;
+  stream.socket().shutdown(asio::ip::tcp::socket::shutdown_send, ec);
 }
 
-// NOLINTNEXTLINE
-boost::asio::awaitable<void> listener(auto&& handle_request, server_config cfg) {
-  auto ex = co_await boost::asio::this_coro::executor;
-
-  boost::asio::ip::tcp::acceptor acceptor(ex, {boost::asio::ip::make_address(cfg.bind_address), cfg.port});
+awaitable<void> accept_loop(auto&& handler, ServerConfig cfg) {
+  auto ex = co_await asio::this_coro::executor;
+  asio::ip::tcp::acceptor acceptor(ex, {asio::ip::make_address(cfg.bind_address), cfg.port});
 
   std::println("[listen] http://{}:{}/", cfg.bind_address, cfg.port);
 
   for(;;) {
-    boost::asio::ip::tcp::socket socket = co_await acceptor.async_accept(boost::asio::use_awaitable);
-
+    auto socket = co_await acceptor.async_accept(asio::use_awaitable);
     auto remote = socket.remote_endpoint();
     std::println("[accept] {}:{}", remote.address().to_string(), remote.port());
 
-    boost::asio::co_spawn(ex, serve_connection(handle_request, std::move(socket)), [](std::exception_ptr ep) {
-      log_exception(ep, stderr, "spawn error");
+    asio::co_spawn(ex, serve_connection(handler, std::move(socket)), [](std::exception_ptr ep) {
+      if(!ep)
+        return;
+      try {
+        std::rethrow_exception(ep);
+      } catch(const std::exception& e) {
+        std::println(stderr, "[spawn] {}", e.what());
+      }
     });
   }
 }
 
-export int run_server(auto handle_request, server_config config) {
+export int run_server(auto handler, ServerConfig cfg) {
   try {
-    boost::asio::io_context io(8);
-
-    boost::asio::co_spawn(io, listener(std::move(handle_request), std::move(config)), [](std::exception_ptr ep) {
-      log_exception(ep, stderr, "fatal coroutine error");
+    asio::io_context io(8);
+    asio::co_spawn(io, accept_loop(std::move(handler), std::move(cfg)), [](std::exception_ptr ep) {
+      if(!ep)
+        return;
+      try {
+        std::rethrow_exception(ep);
+      } catch(const std::exception& e) {
+        std::println(stderr, "[fatal] {}", e.what());
+      }
     });
-
     io.run();
-  } catch(std::exception const& e) {
+  } catch(const std::exception& e) {
     std::println(stderr, "[fatal] {}", e.what());
     return 1;
   }

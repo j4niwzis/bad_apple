@@ -15,8 +15,6 @@ project(
   LANGUAGES CXX
 )
 
-
-
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(
     FATAL_ERROR
@@ -24,9 +22,7 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
-find_package(Boost 1.84 REQUIRED COMPONENTS system)
-find_package(OpenSSL REQUIRED)
-find_package(Threads REQUIRED)
+find_package(Boost 1.84 REQUIRED)
 
 find_package(OpenCV 4 REQUIRED COMPONENTS core videoio imgproc)
 add_executable(video_to_2bpp ${CMAKE_CURRENT_SOURCE_DIR}/tools/video_to_2bpp.cc)
@@ -65,9 +61,7 @@ target_sources(${PROJECT_NAME} PUBLIC FILE_SET CXX_MODULES FILES ${sources})
 
 # Link dependencies
 target_link_libraries(${PROJECT_NAME} PUBLIC
-  Boost::system
-  OpenSSL::SSL
-  Threads::Threads
+  Boost::headers
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
